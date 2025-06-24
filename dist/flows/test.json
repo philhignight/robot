@@ -1,0 +1,143 @@
+{
+  "name": "save-philhignight-webpage",
+  "description": "Opens Chrome, navigates to philhignight.com, inputs 'hi', and saves the page (uses clipboard/paste for text input)",
+  "allowedContext": "/",
+  "steps": [
+    {
+      "type": "click",
+      "name": "focus-chrome",
+      "comment": "Focus Chrome window - navigates to /chrome"
+    },
+    {
+      "type": "click",
+      "name": "open-new-tab",
+      "comment": "Open new tab - navigates to /chrome/tab"
+    },
+    {
+      "type": "click",
+      "name": "focus-address-bar",
+      "comment": "Click on address bar"
+    },
+    {
+      "type": "key",
+      "keys": "ctrl+a",
+      "comment": "Select all text in address bar"
+    },
+    {
+      "type": "key",
+      "keys": "delete",
+      "comment": "Delete selected text"
+    },
+    {
+      "type": "setClipboard",
+      "text": "philhignight.com",
+      "comment": "Set clipboard to URL"
+    },
+    {
+      "type": "paste",
+      "comment": "Paste the URL"
+    },
+    {
+      "type": "key",
+      "keys": "enter",
+      "comment": "Navigate to the website"
+    },
+    {
+      "type": "pause",
+      "ms": 5000,
+      "comment": "Wait 5 seconds for page to load"
+    },
+    {
+      "type": "click",
+      "name": "click-input",
+      "comment": "Click the input box on the page"
+    },
+    {
+      "type": "setClipboard",
+      "text": "hi",
+      "comment": "Set clipboard to 'hi'"
+    },
+    {
+      "type": "paste",
+      "comment": "Paste 'hi' in the input"
+    },
+    {
+      "type": "key",
+      "keys": "enter",
+      "comment": "Submit the input"
+    },
+    {
+      "type": "pause",
+      "ms": 10000,
+      "comment": "Wait 10 seconds"
+    },
+    {
+      "type": "key",
+      "keys": "ctrl+s",
+      "comment": "Open Save As dialog"
+    },
+    {
+      "type": "navigate",
+      "path": "/chrome/tab/save-as-popup",
+      "comment": "Navigate to save-as-popup context to access dialog clicks"
+    },
+    {
+      "type": "click",
+      "name": "focus-save-as-address-bar",
+      "comment": "Click on Save As address bar"
+    },
+    {
+      "type": "key",
+      "keys": "ctrl+a",
+      "comment": "Select all in address bar"
+    },
+    {
+      "type": "key",
+      "keys": "delete",
+      "comment": "Delete selected text"
+    },
+    {
+      "type": "setClipboard",
+      "text": "C:\\Users\\phili\\OneDrive\\Documents\\code\\robot\\pages",
+      "comment": "Set clipboard to save directory path"
+    },
+    {
+      "type": "paste",
+      "comment": "Paste the directory path"
+    },
+    {
+      "type": "key",
+      "keys": "enter",
+      "comment": "Submit the input"
+    },
+    {
+      "type": "click",
+      "name": "focus-save-as-file-name-input",
+      "comment": "Click on file name input"
+    },
+    {
+      "type": "key",
+      "keys": "ctrl+a",
+      "comment": "Select all in file name"
+    },
+    {
+      "type": "key",
+      "keys": "delete",
+      "comment": "Delete selected text"
+    },
+    {
+      "type": "setClipboard",
+      "text": "result.html",
+      "comment": "Set clipboard to file name"
+    },
+    {
+      "type": "paste",
+      "comment": "Paste the file name"
+    },
+    {
+      "type": "click",
+      "name": "click-save-button",
+      "comment": "Click Save button to save the file"
+    }
+  ]
+}

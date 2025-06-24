@@ -1,0 +1,22 @@
+{
+  "name": "robot",
+  "version": "1.0.0",
+  "description": "````\r /chrome> ls\r Contents:\r   tabs/\r   new-tab\r   address-bar",
+  "main": "automation-cli.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/philhignight/robot.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/philhignight/robot/issues"
+  },
+  "homepage": "https://github.com/philhignight/robot#readme",
+  "dependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

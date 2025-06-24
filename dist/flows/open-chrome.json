@@ -1,0 +1,17 @@
+{
+  "name": "open-chrome",
+  "description": "Simply opens Chrome by clicking on it",
+  "allowedContext": "/",
+  "steps": [
+    {
+      "type": "click",
+      "name": "open-chrome",
+      "comment": "Click on Chrome to open it"
+    },
+    {
+      "type": "pause",
+      "ms": 3000,
+      "comment": "Wait 3 seconds for Chrome to fully load"
+    }
+  ]
+}
