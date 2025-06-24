@@ -1,0 +1,28 @@
+{
+  "contexts": {
+    "_root": {
+      "clicks": {
+        "open-chrome": {
+          "x": 626,
+          "y": 689,
+          "targetContext": "chrome"
+        },
+        "open-new-tab": {
+          "x": 932,
+          "y": 19,
+          "targetContext": "new-tab"
+        }
+      },
+      "subcontexts": {
+        "chrome": {
+          "clicks": {},
+          "subcontexts": {}
+        },
+        "new-tab": {
+          "clicks": {},
+          "subcontexts": {}
+        }
+      }
+    }
+  }
+}

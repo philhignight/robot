@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "open-chrome",
+    "comment": "Click on Chrome to open it"
+  },
+  "success": true
+}

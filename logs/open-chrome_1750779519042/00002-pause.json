@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "pause",
+    "ms": 3000,
+    "comment": "Wait 3 seconds for Chrome to fully load"
+  },
+  "success": true
+}
