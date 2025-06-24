@@ -5,13 +5,13 @@ import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
+import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import org.json.*;
 
 public class AutomationRobot {
     private Robot robot;
-    private Clipboard clipboard;
     private static final String INPUT_FILE = "input.txt";
     private static final String OUTPUT_FILE = "output.txt";
     private JFrame overlay;
@@ -19,7 +19,6 @@ public class AutomationRobot {
     
     public AutomationRobot() throws AWTException {
         this.robot = new Robot();
-        this.clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
         robot.setAutoDelay(50); // Small delay between actions
         initOverlay();
     }
@@ -147,31 +146,35 @@ public class AutomationRobot {
                     result.put("success", true);
                     break;
                     
-                case "type":
-                    String text = command.getString("text");
-                    typeString(text);
-                    result.put("success", true);
-                    break;
-                    
                 case "key":
                     String keys = command.getString("keys");
                     pressKeys(keys);
                     result.put("success", true);
                     break;
                     
+                case "setClipboard":
+                    String clipboardText = command.getString("text");
+                    System.out.println("Setting clipboard to: " + clipboardText);
+                    setClipboardText(clipboardText);
+                    result.put("success", true);
+                    break;
+                    
                 case "copy":
+                    robot.delay(100); // Small delay before copy
                     robot.keyPress(KeyEvent.VK_CONTROL);
                     robot.keyPress(KeyEvent.VK_C);
                     robot.keyRelease(KeyEvent.VK_C);
                     robot.keyRelease(KeyEvent.VK_CONTROL);
-                    robot.delay(100); // Give system time to copy
+                    robot.delay(200); // Give system time to copy
                     
                     String copiedText = getClipboardText();
                     result.put("success", true);
                     result.put("clipboard", copiedText);
+                    System.out.println("Copied text: " + copiedText);
                     break;
                     
                 case "paste":
+                    robot.delay(100); // Small delay before paste
                     robot.keyPress(KeyEvent.VK_CONTROL);
                     robot.keyPress(KeyEvent.VK_V);
                     robot.keyRelease(KeyEvent.VK_V);
@@ -221,28 +224,6 @@ public class AutomationRobot {
         }
         
         return result;
-    }
-    
-    private void typeString(String text) {
-        for (char c : text.toCharArray()) {
-            int keyCode = KeyEvent.getExtendedKeyCodeForChar(c);
-            if (KeyEvent.CHAR_UNDEFINED == keyCode) {
-                continue;
-            }
-            
-            boolean needShift = Character.isUpperCase(c) || "!@#$%^&*()_+{}|:\"<>?".indexOf(c) != -1;
-            
-            if (needShift) {
-                robot.keyPress(KeyEvent.VK_SHIFT);
-            }
-            
-            robot.keyPress(keyCode);
-            robot.keyRelease(keyCode);
-            
-            if (needShift) {
-                robot.keyRelease(KeyEvent.VK_SHIFT);
-            }
-        }
     }
     
     private void pressKeys(String keys) {
@@ -325,14 +306,68 @@ public class AutomationRobot {
         }
     }
     
+    private void setClipboardText(String text) {
+        // Check if running on Windows
+        if (!System.getProperty("os.name").toLowerCase().contains("windows")) {
+            System.err.println("ERROR: Clipboard functionality requires Windows OS (uses clip.exe)");
+            return;
+        }
+        
+        try {
+            // Create temp file with text
+            File tempFile = File.createTempFile("clip", ".txt");
+            tempFile.deleteOnExit();
+            
+            // Write text to file with proper encoding
+            try (OutputStreamWriter writer = new OutputStreamWriter(
+                    new FileOutputStream(tempFile), "UTF-8")) {
+                writer.write(text);
+            }
+            
+            // Use clip.exe to set clipboard with UTF-8 support
+            ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "chcp 65001 >nul && type \"" + tempFile.getAbsolutePath() + "\" | clip");
+            pb.environment().put("LANG", "en_US.UTF-8");
+            Process p = pb.start();
+            boolean finished = p.waitFor(2, TimeUnit.SECONDS);
+            
+            if (!finished) {
+                p.destroyForcibly();
+                throw new Exception("Clipboard operation timed out");
+            }
+            
+            if (p.exitValue() != 0) {
+                throw new Exception("clip.exe returned error code: " + p.exitValue());
+            }
+            
+            robot.delay(200); // Give system time to update clipboard
+            
+            // Verify it was set
+            String check = getClipboardText();
+            if (text.equals(check)) {
+                System.out.println("Clipboard set successfully");
+            } else {
+                System.err.println("Warning: Clipboard verification failed");
+                System.err.println("Expected: " + text);
+                System.err.println("Got: " + check);
+            }
+            
+            tempFile.delete();
+            
+        } catch (Exception e) {
+            System.err.println("Error setting clipboard: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
     private String getClipboardText() {
         try {
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
             Transferable contents = clipboard.getContents(null);
             if (contents != null && contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
                 return (String) contents.getTransferData(DataFlavor.stringFlavor);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Error reading clipboard: " + e.getMessage());
         }
         return "";
     }
@@ -359,6 +394,11 @@ public class AutomationRobot {
     }
     
     public static void main(String[] args) {
+        if (args.length > 0 && args[0].equals("test")) {
+            testClipboard();
+            return;
+        }
+        
         try {
             AutomationRobot robot = new AutomationRobot();
             
@@ -371,6 +411,29 @@ public class AutomationRobot {
         } catch (AWTException e) {
             System.err.println("Failed to create Robot: " + e.getMessage());
             System.exit(1);
+        }
+    }
+    
+    // Test method to verify clipboard functionality
+    public static void testClipboard() {
+        try {
+            AutomationRobot robot = new AutomationRobot();
+            System.out.println("\n=== Testing Clipboard Functionality ===");
+            System.out.println("Using Windows clip.exe method\n");
+            
+            String testText = "Test clipboard text 123!@#";
+            System.out.println("Setting clipboard to: " + testText);
+            robot.setClipboardText(testText);
+            
+            Thread.sleep(500);
+            
+            String result = robot.getClipboardText();
+            System.out.println("Reading clipboard: " + result);
+            System.out.println("\nTest " + (testText.equals(result) ? "PASSED" : "FAILED"));
+            
+        } catch (Exception e) {
+            System.err.println("Clipboard test failed: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

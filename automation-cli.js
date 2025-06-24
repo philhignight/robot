@@ -12,21 +12,6 @@ const OUTPUT_FILE = "output.txt";
 const FLOWS_DIR = "flows";
 const LOGS_DIR = "logs";
 
-// Clicks are stored hierarchically under _root:
-// {
-//   contexts: {
-//     _root: {
-//       clicks: { "open-chrome": {...} },
-//       subcontexts: {
-//         chrome: {
-//           clicks: { "new-tab": {...} },
-//           subcontexts: { ... }
-//         }
-//       }
-//     }
-//   }
-// }
-
 class AutomationCLI {
   constructor() {
     this.currentContext = [];
@@ -55,13 +40,28 @@ class AutomationCLI {
     if (fs.existsSync(INPUT_FILE)) fs.unlinkSync(INPUT_FILE);
     if (fs.existsSync(OUTPUT_FILE)) fs.unlinkSync(OUTPUT_FILE);
 
-    this.javaProcess = spawn(
-      "java",
-      ["-cp", "json-20210307.jar;.", "AutomationRobot"],
-      {
-        stdio: "inherit", // This will show Java output
-      }
-    );
+    // Check if running from distribution (JAR exists)
+    let javaArgs;
+    if (fs.existsSync("AutomationRobot.jar")) {
+      console.log("Running from distribution JAR...");
+      javaArgs = ["-jar", "AutomationRobot.jar"];
+    } else if (
+      fs.existsSync("json-20210307.jar") &&
+      fs.existsSync("AutomationRobot.class")
+    ) {
+      console.log("Running from development environment...");
+      javaArgs = ["-cp", "json-20210307.jar;.", "AutomationRobot"];
+    } else {
+      console.error(
+        "ERROR: AutomationRobot.jar or compiled classes not found!"
+      );
+      console.error("Please run build-dist.bat or compile-and-run.bat first.");
+      process.exit(1);
+    }
+
+    this.javaProcess = spawn("java", javaArgs, {
+      stdio: "inherit",
+    });
 
     this.javaProcess.on("error", (err) => {
       console.error("Failed to start Java Robot:", err);
@@ -125,7 +125,6 @@ class AutomationCLI {
   }
 
   async sendToRobot(command) {
-    console.log("Sending command to robot:", command);
     fs.writeFileSync(INPUT_FILE, JSON.stringify(command));
 
     // Wait for response
@@ -137,7 +136,6 @@ class AutomationCLI {
           const content = fs.readFileSync(OUTPUT_FILE, "utf8");
           if (content && content.trim()) {
             fs.unlinkSync(OUTPUT_FILE);
-            console.log("Robot response:", content);
             return JSON.parse(content);
           }
         } catch (e) {
@@ -148,7 +146,6 @@ class AutomationCLI {
       attempts++;
     }
     console.error("Robot timeout - no response received");
-    console.error("Check if Java process is running and input.txt exists");
     throw new Error("Robot timeout");
   }
 
@@ -158,38 +155,103 @@ class AutomationCLI {
     });
   }
 
-  async recordClick(delay = 5) {
-    const name = await this.ask("Click name: ");
-
-    // Default to current context
-    const currentPath = "/" + this.currentContext.join("/");
-    const defaultContext = currentPath === "/" ? "/" : currentPath;
-
-    let targetContext = await this.ask(
-      `Target context (Enter="${defaultContext}", "*"=any, or path): `
-    );
-
-    // Handle default (empty input means current context)
-    if (!targetContext || targetContext.trim() === "") {
-      targetContext = defaultContext;
-      console.log(`Using default context: ${targetContext}`);
-    } else if (targetContext === "*") {
-      targetContext = ""; // Empty means no navigation
-      console.log("Click will not change context");
-    } else if (targetContext === ".") {
-      targetContext = defaultContext;
-      console.log(`Using current context: ${targetContext}`);
+  getAllContextPaths(
+    obj = this.clicks.contexts._root,
+    currentPath = "",
+    paths = []
+  ) {
+    // Add current path if it's not root
+    if (currentPath !== "") {
+      paths.push(currentPath);
     }
 
-    console.log(`You have ${delay} seconds to position your mouse...`);
+    // Recursively add all subcontexts
+    if (obj.subcontexts) {
+      for (const name in obj.subcontexts) {
+        const newPath =
+          currentPath === "" ? `/${name}` : `${currentPath}/${name}`;
+        this.getAllContextPaths(obj.subcontexts[name], newPath, paths);
+      }
+    }
+
+    return paths;
+  }
+
+  async recordClick(delay = 5) {
+    const name = await this.ask('Click name (or "cancel"): ');
+    if (!name || name.toLowerCase() === "cancel") {
+      console.log("Recording cancelled");
+      return;
+    }
+
+    // Build menu of available contexts
+    const allContexts = this.getAllContextPaths();
+    allContexts.unshift("/"); // Add root at the beginning
+
+    console.log("\nWhere should this click navigate to?");
+    console.log("  0) Stay in current context (no navigation)");
+    allContexts.forEach((ctx, i) => {
+      const currentMarker =
+        ctx === "/" + this.currentContext.join("/") ||
+        (ctx === "/" && this.currentContext.length === 0)
+          ? " [current]"
+          : "";
+      console.log(`  ${i + 1}) ${ctx}${currentMarker}`);
+    });
+    console.log(`  ${allContexts.length + 1}) Create new context...`);
+
+    const choice = await this.ask(
+      "\nEnter your choice (0-" + (allContexts.length + 1) + ', or "cancel"): '
+    );
+    if (!choice || choice.toLowerCase() === "cancel") {
+      console.log("Recording cancelled");
+      return;
+    }
+
+    const choiceNum = parseInt(choice);
+    let targetContext = "";
+
+    if (choiceNum === 0) {
+      console.log("Click will not change context");
+    } else if (choiceNum > 0 && choiceNum <= allContexts.length) {
+      targetContext = allContexts[choiceNum - 1];
+      console.log(`Click will navigate to: ${targetContext}`);
+    } else if (choiceNum === allContexts.length + 1) {
+      // Create new context
+      const newContextName = await this.ask(
+        'Name for new context (or "cancel"): '
+      );
+      if (!newContextName || newContextName.toLowerCase() === "cancel") {
+        console.log("Recording cancelled");
+        return;
+      }
+
+      // Create the context in current location
+      const created = this.makeContext(newContextName);
+      if (!created) {
+        console.log("Recording cancelled");
+        return;
+      }
+      targetContext =
+        this.currentContext.length === 0
+          ? `/${newContextName}`
+          : `/${this.currentContext.join("/")}/${newContextName}`;
+      console.log(`Click will navigate to new context: ${targetContext}`);
+    } else {
+      console.log("Invalid choice, recording cancelled");
+      return;
+    }
+
+    console.log(`\nYou have ${delay} seconds to position your mouse...`);
 
     // Show countdown overlay
     for (let i = delay; i > 0; i--) {
       await this.sendToRobot({
         action: "showOverlay",
         text: i.toString(),
-        duration: 900, // Show for 900ms
+        duration: 900,
       });
+      console.log(`${i}...`);
       await new Promise((r) => setTimeout(r, 1000));
     }
 
@@ -197,7 +259,7 @@ class AutomationCLI {
     await this.sendToRobot({
       action: "showOverlay",
       text: "RECORDING!",
-      duration: 0, // Keep showing
+      duration: 0,
     });
 
     const pos = await this.sendToRobot({ action: "getMousePosition" });
@@ -206,7 +268,7 @@ class AutomationCLI {
     await this.sendToRobot({
       action: "showOverlay",
       text: `Recorded!\n(${pos.x}, ${pos.y})`,
-      duration: 2000, // Show for 2 seconds
+      duration: 2000,
     });
 
     console.log(`Click recorded at (${pos.x}, ${pos.y})`);
@@ -215,7 +277,6 @@ class AutomationCLI {
     if (targetContext !== "") {
       click.targetContext = targetContext;
     }
-    // If targetContext is empty string (from "*"), we don't add targetContext property
 
     // Save to current context
     const contextObj = this.getCurrentContextObj();
@@ -223,12 +284,12 @@ class AutomationCLI {
 
     this.saveClicks();
     console.log(`\nClick '${name}' saved at (${pos.x}, ${pos.y})`);
-    if (targetContext === "") {
-      console.log(`Target context: none (stays in any context)`);
-    } else {
-      console.log(`Target context: ${targetContext}`);
-    }
     console.log(`Location: ${this.getPrompt()}${name}`);
+    if (targetContext !== "") {
+      console.log(`Navigates to: ${targetContext}`);
+    } else {
+      console.log(`Navigates to: (stays in current context)`);
+    }
   }
 
   listContents() {
@@ -295,7 +356,12 @@ class AutomationCLI {
     this.rl.setPrompt(this.getPrompt());
   }
 
-  makeContext(name) {
+  makeContext(name, silent = false) {
+    if (!name) {
+      console.log("Context name required");
+      return false;
+    }
+
     const contextObj = this.getCurrentContextObj();
 
     if (!contextObj.subcontexts[name]) {
@@ -303,13 +369,159 @@ class AutomationCLI {
         clicks: {},
         subcontexts: {},
       };
+    } else {
+      console.log(`Context '${name}' already exists`);
+      return false;
     }
 
     this.saveClicks();
-    console.log(`Context '${name}' created`);
-    console.log(
-      `Tip: Use 'cd ${name}' to enter this context, then 'record' to add clicks`
-    );
+    if (!silent) {
+      console.log(`Context '${name}' created`);
+      console.log(
+        `Tip: Use 'cd ${name}' to enter this context, then 'record' to add clicks`
+      );
+    }
+    return true;
+  }
+
+  async moveItem(itemName, targetPath) {
+    const currentObj = this.getCurrentContextObj();
+    let item = null;
+    let isContext = false;
+
+    // Check if it's a click or context
+    if (currentObj.clicks && currentObj.clicks[itemName]) {
+      item = currentObj.clicks[itemName];
+      isContext = false;
+    } else if (currentObj.subcontexts && currentObj.subcontexts[itemName]) {
+      item = currentObj.subcontexts[itemName];
+      isContext = true;
+    } else {
+      console.log(`Item '${itemName}' not found in current context`);
+      return;
+    }
+
+    // Parse target path
+    let targetContext = [];
+    if (targetPath === "/") {
+      targetContext = [];
+    } else if (targetPath.startsWith("/")) {
+      targetContext = targetPath
+        .substring(1)
+        .split("/")
+        .filter((x) => x);
+    } else {
+      // Relative path from current
+      targetContext = [...this.currentContext];
+      const parts = targetPath.split("/");
+      for (const part of parts) {
+        if (part === "..") {
+          targetContext.pop();
+        } else if (part && part !== ".") {
+          targetContext.push(part);
+        }
+      }
+    }
+
+    // Navigate to target and verify it exists
+    let targetObj = this.clicks.contexts._root;
+    for (const ctx of targetContext) {
+      if (!targetObj.subcontexts || !targetObj.subcontexts[ctx]) {
+        console.log(`Target context '${targetPath}' not found`);
+        return;
+      }
+      targetObj = targetObj.subcontexts[ctx];
+    }
+
+    // Move the item
+    if (isContext) {
+      targetObj.subcontexts[itemName] = item;
+      delete currentObj.subcontexts[itemName];
+      console.log(`Moved context '${itemName}' to ${targetPath || "/"}`);
+    } else {
+      targetObj.clicks[itemName] = item;
+      delete currentObj.clicks[itemName];
+      console.log(`Moved click '${itemName}' to ${targetPath || "/"}`);
+    }
+
+    this.saveClicks();
+  }
+
+  async renameItem(oldName, newName) {
+    const currentObj = this.getCurrentContextObj();
+
+    // Check if it's a click
+    if (currentObj.clicks && currentObj.clicks[oldName]) {
+      currentObj.clicks[newName] = currentObj.clicks[oldName];
+      delete currentObj.clicks[oldName];
+      console.log(`Renamed click '${oldName}' to '${newName}'`);
+      this.saveClicks();
+      return;
+    }
+
+    // Check if it's a context
+    if (currentObj.subcontexts && currentObj.subcontexts[oldName]) {
+      currentObj.subcontexts[newName] = currentObj.subcontexts[oldName];
+      delete currentObj.subcontexts[oldName];
+      console.log(`Renamed context '${oldName}' to '${newName}'`);
+      this.saveClicks();
+      return;
+    }
+
+    console.log(`Item '${oldName}' not found in current context`);
+  }
+
+  findClick(name) {
+    // Build the scope chain - current context up to root
+    const scopeChain = [];
+    let contextPath = [...this.currentContext];
+
+    // Add current context
+    let obj = this.clicks.contexts._root;
+    for (const ctx of contextPath) {
+      obj = obj.subcontexts[ctx];
+    }
+    scopeChain.push(obj);
+
+    // Add parent contexts up to root
+    while (contextPath.length > 0) {
+      contextPath.pop();
+      obj = this.clicks.contexts._root;
+      for (const ctx of contextPath) {
+        obj = obj.subcontexts[ctx];
+      }
+      scopeChain.push(obj);
+    }
+
+    // Add root if not already there
+    if (
+      contextPath.length === 0 &&
+      scopeChain[scopeChain.length - 1] !== this.clicks.contexts._root
+    ) {
+      scopeChain.push(this.clicks.contexts._root);
+    }
+
+    // Search through scope chain
+    for (let i = 0; i < scopeChain.length; i++) {
+      const context = scopeChain[i];
+
+      // Check current context's clicks
+      if (context.clicks && context.clicks[name]) {
+        return context.clicks[name];
+      }
+
+      // For parent contexts, also check sibling contexts (aunt/uncle clicks)
+      if (i > 0 && context.subcontexts) {
+        for (const siblingName in context.subcontexts) {
+          const sibling = context.subcontexts[siblingName];
+          if (sibling.clicks && sibling.clicks[name]) {
+            return sibling.clicks[name];
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   async executeFlow(flowName) {
@@ -354,7 +566,12 @@ class AutomationCLI {
 
           case "click":
             const click = this.findClick(step.name);
-            if (!click) throw new Error(`Click '${step.name}' not found`);
+            if (!click) {
+              console.error(
+                `Click '${step.name}' not found in current context or parent scopes`
+              );
+              throw new Error(`Click '${step.name}' not found`);
+            }
 
             await this.sendToRobot({
               action: "click",
@@ -369,8 +586,10 @@ class AutomationCLI {
             }
             break;
 
-          case "type":
-            await this.sendToRobot({ action: "type", text: step.text });
+          case "setClipboard":
+            await this.sendToRobot({ action: "setClipboard", text: step.text });
+            // Small delay to ensure clipboard is set
+            await new Promise((r) => setTimeout(r, 300));
             break;
 
           case "key":
@@ -450,15 +669,19 @@ class AutomationCLI {
   async executeCheckpoint(checkpoint) {
     for (const action of checkpoint.actions) {
       switch (action.type) {
+        case "click":
         case "doubleClick":
           const click = this.findClick(action.name);
-          if (!click) return false;
+          if (!click) {
+            console.error(`Checkpoint click '${action.name}' not found`);
+            return false;
+          }
 
           await this.sendToRobot({
             action: "click",
             x: click.x,
             y: click.y,
-            doubleClick: true,
+            doubleClick: action.type === "doubleClick",
           });
           break;
 
@@ -480,10 +703,42 @@ class AutomationCLI {
     return true;
   }
 
-  findClick(name) {
-    // Search in current context
-    const contextObj = this.getCurrentContextObj();
-    return contextObj.clicks[name] || null;
+  printUsage() {
+    console.log("\n=== Windows Automation CLI ===");
+    console.log("\nQuick Start Example:");
+    console.log("  /> mkcontext chrome      # Create a chrome context");
+    console.log(
+      "  /> record                # Record click (menu for navigation)"
+    );
+    console.log("  /> cd chrome             # Enter chrome context");
+    console.log("  /chrome> record          # Record clicks within chrome");
+    console.log("  /chrome> cd /            # Go back to root");
+    console.log("  /> run my-flow           # Execute an automation");
+    console.log("\nCommands:");
+    console.log("  record         - Record click with 5 second countdown");
+    console.log("  recordfast/rf  - Record click with 2 second countdown");
+    console.log(
+      "  ls            - List contexts and clicks in current context"
+    );
+    console.log("  cd <path>     - Change context (cd .., cd /, cd chrome)");
+    console.log("  mkcontext <n> - Create new context");
+    console.log("  move <i> <p>  - Move item to target parent context");
+    console.log("  rename <o> <n>- Rename click or context");
+    console.log("  run <flow>    - Execute flow from flows/ directory");
+    console.log("  clear/cls     - Clear screen and show help");
+    console.log("  help / ?      - Show this help");
+    console.log("  exit          - Quit");
+    console.log("\nTips:");
+    console.log("  - Clicks are always saved in current context");
+    console.log('  - Type "cancel" during prompts to abort');
+    console.log(
+      "  - Navigation menu lets you choose target context or create new"
+    );
+    console.log(
+      "  - Clicks can access parent and sibling contexts (scope chain)"
+    );
+    console.log("\nCurrent context: " + this.getPrompt());
+    console.log("");
   }
 
   async processCommand(line) {
@@ -512,8 +767,36 @@ class AutomationCLI {
         break;
 
       case "mkcontext":
-        if (args[0]) this.makeContext(args[0]);
-        else console.log("Usage: mkcontext <name>");
+        if (args[0]) {
+          this.makeContext(args[0], false);
+        } else {
+          const name = await this.ask('Context name (or "cancel"): ');
+          if (name && name.toLowerCase() !== "cancel") {
+            this.makeContext(name, false);
+          } else {
+            console.log("Context creation cancelled");
+          }
+        }
+        break;
+
+      case "move":
+        if (args.length >= 2) {
+          await this.moveItem(args[0], args.slice(1).join(" "));
+        } else {
+          console.log("Usage: move <item> <target-parent>");
+          console.log("Example: move new-tab /chrome/tabs");
+          console.log("Example: move devtools /");
+        }
+        break;
+
+      case "rename":
+        if (args.length >= 2) {
+          await this.renameItem(args[0], args.slice(1).join(" "));
+        } else {
+          console.log("Usage: rename <old-name> <new-name>");
+          console.log("Example: rename new-tab create-tab");
+          console.log("Example: rename devtools developer-tools");
+        }
         break;
 
       case "run":
@@ -544,14 +827,14 @@ class AutomationCLI {
         this.printUsage();
         break;
 
-      case "exit":
-        this.cleanup();
-        process.exit(0);
-        break;
-
       case "help":
       case "?":
         this.printUsage();
+        break;
+
+      case "exit":
+        this.cleanup();
+        process.exit(0);
         break;
 
       default:
@@ -568,41 +851,6 @@ class AutomationCLI {
     }
     if (fs.existsSync(INPUT_FILE)) fs.unlinkSync(INPUT_FILE);
     if (fs.existsSync(OUTPUT_FILE)) fs.unlinkSync(OUTPUT_FILE);
-  }
-
-  printUsage() {
-    console.log("\n=== Windows Automation CLI ===");
-    console.log("\nQuick Start Example:");
-    console.log("  /> mkcontext chrome      # Create a chrome context");
-    console.log("  /> record                # Record opening chrome");
-    console.log("  /> cd chrome             # Enter chrome context");
-    console.log(
-      "  /chrome> record          # Record clicks (Enter for /chrome, * for any)"
-    );
-    console.log("  /chrome> cd /            # Go back to root");
-    console.log("  /> run my-flow           # Execute an automation");
-    console.log("\nCommands:");
-    console.log("  record         - Record click with 5 second countdown");
-    console.log("  recordfast/rf  - Record click with 2 second countdown");
-    console.log(
-      "  ls            - List contexts and clicks in current context"
-    );
-    console.log("  cd <path>     - Change context (cd .., cd /, cd chrome)");
-    console.log("  mkcontext <n> - Create new context");
-    console.log("  run <flow>    - Execute flow from flows/ directory");
-    console.log("  clear/cls     - Clear screen and show help");
-    console.log("  help / ?      - Show this help");
-    console.log("  exit          - Quit");
-    console.log("\nTips:");
-    console.log(
-      "  - When recording, default (Enter) = navigate to current context"
-    );
-    console.log('  - Use "*" for clicks that should not change context');
-    console.log(
-      '  - Use paths like "/chrome" or "../other" for specific navigation'
-    );
-    console.log("\nCurrent context: " + this.getPrompt());
-    console.log("");
   }
 
   start() {

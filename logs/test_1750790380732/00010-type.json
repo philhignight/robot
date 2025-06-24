@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "type",
+    "text": "hi",
+    "comment": "Type 'hi' in the input"
+  },
+  "success": true
+}

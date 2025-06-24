@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "setClipboard",
+    "text": "hi",
+    "comment": "Set clipboard to 'hi'"
+  },
+  "success": true
+}

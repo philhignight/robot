@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "open-new-tab",
+    "comment": "Open new tab - navigates to /chrome/tab"
+  },
+  "success": true
+}

@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "setClipboard",
+    "text": "C:\\Users\\phili\\OneDrive\\Documents\\code\\robot\\pages",
+    "comment": "Set clipboard to save directory path"
+  },
+  "success": true
+}

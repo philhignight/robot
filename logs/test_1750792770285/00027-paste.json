@@ -1,0 +1,7 @@
+{
+  "step": {
+    "type": "paste",
+    "comment": "Paste the file name"
+  },
+  "success": true
+}

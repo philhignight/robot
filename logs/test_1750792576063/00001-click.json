@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "focus-chrome",
+    "comment": "Focus Chrome window - navigates to /chrome"
+  },
+  "success": true
+}

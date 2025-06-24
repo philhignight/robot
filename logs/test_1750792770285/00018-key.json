@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "key",
+    "keys": "ctrl+a",
+    "comment": "Select all in address bar"
+  },
+  "success": true
+}

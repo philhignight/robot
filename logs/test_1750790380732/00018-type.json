@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "type",
+    "text": "C:\\Users\\phili\\OneDrive\\Documents\\code\\robot\\pages",
+    "comment": "Type the save directory path"
+  },
+  "success": true
+}

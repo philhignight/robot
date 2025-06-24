@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "focus-save-as-address-bar",
+    "comment": "Click on Save As address bar"
+  },
+  "success": true
+}

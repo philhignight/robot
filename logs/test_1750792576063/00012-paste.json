@@ -1,0 +1,7 @@
+{
+  "step": {
+    "type": "paste",
+    "comment": "Paste 'hi' in the input"
+  },
+  "success": true
+}

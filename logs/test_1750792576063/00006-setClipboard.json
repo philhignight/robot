@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "setClipboard",
+    "text": "philhignight.com",
+    "comment": "Set clipboard to URL"
+  },
+  "success": true
+}

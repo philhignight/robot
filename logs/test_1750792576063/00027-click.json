@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "click-save-button",
+    "comment": "Click Save button to save the file"
+  },
+  "success": true
+}

@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "key",
+    "keys": "ctrl+s",
+    "comment": "Open Save As dialog"
+  },
+  "success": true
+}

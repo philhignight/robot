@@ -2,25 +2,58 @@
   "contexts": {
     "_root": {
       "clicks": {
-        "open-chrome": {
-          "x": 626,
+        "focus-chrome": {
+          "x": 623,
           "y": 689,
           "targetContext": "chrome"
-        },
-        "open-new-tab": {
-          "x": 932,
-          "y": 19,
-          "targetContext": "new-tab"
         }
       },
       "subcontexts": {
         "chrome": {
-          "clicks": {},
-          "subcontexts": {}
-        },
-        "new-tab": {
-          "clicks": {},
-          "subcontexts": {}
+          "clicks": {
+            "open-new-tab": {
+              "x": 932,
+              "y": 21,
+              "targetContext": "tab"
+            }
+          },
+          "subcontexts": {
+            "tab": {
+              "clicks": {
+                "focus-address-bar": {
+                  "x": 532,
+                  "y": 62
+                },
+                "click-input": {
+                  "x": 588,
+                  "y": 557
+                }
+              },
+              "subcontexts": {
+                "philhignight_com_website": {
+                  "clicks": {},
+                  "subcontexts": {}
+                },
+                "save-as-popup": {
+                  "clicks": {
+                    "focus-save-as-address-bar": {
+                      "x": 448,
+                      "y": 50
+                    },
+                    "focus-save-as-file-name-input": {
+                      "x": 337,
+                      "y": 500
+                    },
+                    "click-save-button": {
+                      "x": 964,
+                      "y": 628
+                    }
+                  },
+                  "subcontexts": {}
+                }
+              }
+            }
+          }
         }
       }
     }

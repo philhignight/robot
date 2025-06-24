@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "pause",
+    "ms": 5000,
+    "comment": "Wait 5 seconds for page to load"
+  },
+  "success": true
+}

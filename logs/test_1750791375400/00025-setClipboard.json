@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "setClipboard",
+    "text": "result.html",
+    "comment": "Set clipboard to file name"
+  },
+  "success": true
+}

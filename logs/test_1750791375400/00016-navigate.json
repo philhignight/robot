@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "navigate",
+    "path": "/chrome/tab/save-as-popup",
+    "comment": "Navigate to save-as-popup context to access dialog clicks"
+  },
+  "success": true
+}

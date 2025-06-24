@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "key",
+    "keys": "delete",
+    "comment": "Delete selected text"
+  },
+  "success": true
+}

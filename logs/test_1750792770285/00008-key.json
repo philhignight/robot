@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "key",
+    "keys": "enter",
+    "comment": "Navigate to the website"
+  },
+  "success": true
+}

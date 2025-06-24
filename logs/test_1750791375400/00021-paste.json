@@ -1,0 +1,7 @@
+{
+  "step": {
+    "type": "paste",
+    "comment": "Paste the directory path"
+  },
+  "success": true
+}

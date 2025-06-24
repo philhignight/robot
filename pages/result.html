@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<!-- saved from url=(0025)https://philhignight.com/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Chat</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f7f7f8;
+            color: #1a1a1a;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        #new-chat-button {
+            background-color: #fff;
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #new-chat-button:hover {
+            background-color: #f5f5f5;
+            border-color: #b0b0b0;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 20px 0;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.user {
+            background-color: #e3f2fd;
+            margin-left: 40px;
+        }
+
+        .message.assistant {
+            background-color: #fff;
+            margin-right: 40px;
+            position: relative;
+        }
+
+        .message-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .message-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .copy-response-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-response-btn:hover {
+            background-color: #e0e0e0;
+        }
+
+        .copy-response-btn.copied {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .input-container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        #chat-input {
+            width: 100%;
+            min-height: 60px;
+            max-height: 200px;
+            padding: 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            font-size: 16px;
+            line-height: 1.5;
+            resize: vertical;
+            overflow-y: auto;
+            outline: none;
+            margin-bottom: 12px;
+        }
+
+        #chat-input:focus {
+            border-color: #2196F3;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+        }
+
+        #submit-prompt-btn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            float: right;
+        }
+
+        #submit-prompt-btn:hover:not(:disabled) {
+            background-color: #1976D2;
+        }
+
+        #submit-prompt-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Claude Chat</h1>
+            <button id="new-chat-button">New Chat</button>
+        </div>
+        
+        <div class="chat-container" id="chat-container">
+            <!-- Messages will be dynamically added here -->
+        <div class="message user"><div class="message-label">You</div><div class="message-content">hi</div></div><div class="message assistant"><div class="message-label">Claude</div><div class="message-content">Error: 404 {"type":"error","error":{"type":"not_found_error","message":"model: claude-3-7-sonnet-20250131"}}</div></div></div>
+        
+        <div class="input-container">
+            <div id="chat-input" contenteditable="true" placeholder="Type your message here..."></div>
+            <button id="submit-prompt-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let chatHistory = [];
+        let currentStreamingMessage = null;
+
+        const chatInput = document.getElementById('chat-input');
+        const submitBtn = document.getElementById('submit-prompt-btn');
+        const newChatBtn = document.getElementById('new-chat-button');
+        const chatContainer = document.getElementById('chat-container');
+
+        // Handle submit
+        function submitPrompt() {
+            const prompt = chatInput.innerText.trim();
+            if (!prompt) return;
+
+            // Disable input
+            chatInput.contentEditable = false;
+            submitBtn.disabled = true;
+
+            // Add user message to display
+            addMessage('user', prompt);
+            
+            // Clear input
+            chatInput.innerText = '';
+
+            // Stream response
+            streamResponse(prompt);
+        }
+
+        // Add message to chat
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'message-label';
+            labelDiv.textContent = role === 'user' ? 'You' : 'Claude';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(labelDiv);
+            messageDiv.appendChild(contentDiv);
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            return messageDiv;
+        }
+
+        // Stream response from server
+        async function streamResponse(prompt) {
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        history: chatHistory
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let responseContentContainer = null;
+                let fullResponse = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.slice(6));
+                            
+                            if (data.type === 'content') {
+                                // Create response container on first content
+                                if (!responseContentContainer) {
+                                    currentStreamingMessage = addMessage('assistant', '');
+                                    responseContentContainer = currentStreamingMessage.querySelector('.message-content');
+                                    responseContentContainer.id = 'response-content-container';
+                                }
+                                
+                                // Append content
+                                fullResponse += data.content;
+                                responseContentContainer.textContent = fullResponse;
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            } else if (data.type === 'done') {
+                                // Add copy button
+                                if (currentStreamingMessage && fullResponse) {
+                                    const copyBtn = document.createElement('button');
+                                    copyBtn.className = 'copy-response-btn';
+                                    copyBtn.textContent = 'Copy';
+                                    copyBtn.onclick = () => copyToClipboard(fullResponse, copyBtn);
+                                    currentStreamingMessage.appendChild(copyBtn);
+                                }
+                                
+                                // Update chat history
+                                chatHistory.push(
+                                    { role: 'user', content: prompt },
+                                    { role: 'assistant', content: fullResponse }
+                                );
+                            } else if (data.type === 'error') {
+                                console.error('Error:', data.error);
+                                if (!responseContentContainer) {
+                                    currentStreamingMessage = addMessage('assistant', `Error: ${data.error}`);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('assistant', `Error: ${error.message}`);
+            } finally {
+                // Re-enable input
+                chatInput.contentEditable = true;
+                submitBtn.disabled = false;
+                chatInput.focus();
+            }
+        }
+
+        // Copy to clipboard
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+
+        // New chat
+        function newChat() {
+            chatHistory = [];
+            chatContainer.innerHTML = '';
+            chatInput.focus();
+        }
+
+        // Event listeners
+        submitBtn.addEventListener('click', submitPrompt);
+        newChatBtn.addEventListener('click', newChat);
+
+        // Handle Enter key
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitPrompt();
+            }
+        });
+
+        // Focus on load
+        chatInput.focus();
+    </script>
+
+</body></html>

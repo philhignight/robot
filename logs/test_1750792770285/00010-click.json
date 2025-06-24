@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "click-input",
+    "comment": "Click the input box on the page"
+  },
+  "success": true
+}

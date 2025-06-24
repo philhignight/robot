@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "focus-address-bar",
+    "comment": "Click on address bar"
+  },
+  "success": true
+}

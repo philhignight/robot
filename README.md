@@ -1,5 +1,28 @@
-### Recording Tips:
+### Move and Rename Examples:
 
+````
+/chrome> ls
+Contents:
+  tabs/
+  new-tab
+  address-bar
+
+# Move a click to a subcontext
+/chrome> move new-tab tabs
+Moved click 'new-tab' to tabs
+
+# Move a context to root
+/chrome> move tabs /
+Moved context 'tabs' to /
+
+# Rename a click
+/chrome> rename address-bar url-bar
+Renamed click 'address-bar' to 'url-bar'
+
+# Move with relative paths
+/chrome/devtools> move console-tab ..
+Moved click 'console-tab' to /chrome
+```### Recording Tips:
 - Leave target context blank: Click stays in current context, no navigation
 - Use "." for target context: Click will navigate to the current context you're in
 - Use absolute path like "/chrome": Click will navigate to that specific context
@@ -19,16 +42,14 @@ Simple automation system for recording and replaying clicks and keyboard actions
 ## Setup
 
 1. **Install Dependencies**
-
    - Node.js 12.18
    - Java 11
    - Download `json-20210307.jar` from Maven repository for JSON parsing in Java
 
 2. **Compile Java**
-
    ```bash
    javac -cp "json-20210307.jar;." AutomationRobot.java
-   ```
+````
 
 3. **Make Node script executable**
    ```bash
@@ -76,12 +97,14 @@ Simple automation system for recording and replaying clicks and keyboard actions
 
 2. **Basic Commands**
    - `mkcontext chrome` - Create a new context called "chrome"
-   - `record` - Record a new click (5 second countdown)
-   - `recordfast` or `rf` - Record a new click (2 second countdown)
+   - `record` - Record a new click (5 second countdown, type "cancel" to abort)
+   - `recordfast` or `rf` - Record a new click (2 second countdown, type "cancel" to abort)
    - `ls` - List all contexts and clicks in current context
    - `cd chrome` - Navigate into the chrome context
    - `cd ..` - Go back to parent context
    - `cd /` - Go to root context
+   - `move item target` - Move a click or context to another parent
+   - `rename old new` - Rename a click or context
    - `run my-flow` - Execute flow from flows/my-flow.json
    - `clear` or `cls` - Clear screen and show help
    - `help` or `?` - Show usage instructions
@@ -171,3 +194,4 @@ project/
 - Checkpoints can verify clipboard content to ensure correct state
 - The system uses file-based communication between Node.js and Java
 - All contexts are subcontexts of the root (\_root) - the app will automatically migrate old formats
+- Click scope follows a closure-like pattern - you can access clicks from parent contexts and their siblings

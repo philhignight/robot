@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "click",
+    "name": "focus-save-as-file-name-input",
+    "comment": "Click on file name input"
+  },
+  "success": true
+}

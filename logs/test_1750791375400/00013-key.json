@@ -1,0 +1,8 @@
+{
+  "step": {
+    "type": "key",
+    "keys": "enter",
+    "comment": "Submit the input"
+  },
+  "success": true
+}
