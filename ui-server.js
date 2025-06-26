@@ -1,18 +1,14 @@
-const express = require('express');
+const http = require('http');
 const fs = require('fs').promises;
 const path = require('path');
+const url = require('url');
 
-const app = express();
 const PORT = 3000;
 
 // Workspace paths
 const WORKSPACE = path.join(__dirname, 'workspace');
 const INBOX = path.join(WORKSPACE, 'inbox.md');
 const CONVERSATION = path.join(WORKSPACE, 'conversation.json');
-
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Helper: Write file atomically
 async function writeFileAtomic(filePath, content) {
@@ -31,19 +27,62 @@ async function readFileSafe(filePath) {
     }
 }
 
-// Main page - render chat with history
-app.get('/', async (req, res) => {
-    try {
-        // Read conversation history
-        const conversationData = await readFileSafe(CONVERSATION);
-        const conversation = conversationData ? JSON.parse(conversationData) : [];
-        
-        // Filter out system messages
-        const messages = conversation.filter(msg => msg.type !== 'system');
-        
-        // Render HTML with embedded history
-        const html = `
-<!DOCTYPE html>
+// Helper: Parse JSON body from request
+function parseJSON(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                resolve(JSON.parse(body));
+            } catch (err) {
+                reject(err);
+            }
+        });
+        req.on('error', reject);
+    });
+}
+
+// Helper: Send JSON response
+function sendJSON(res, statusCode, data) {
+    res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+}
+
+// Helper: Escape HTML
+function escapeHtml(str) {
+    const chars = { 
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    };
+    return str.replace(/[&<>"']/g, m => chars[m]);
+}
+
+// Helper: Format timestamp from archive ID
+function formatTimestamp(id) {
+    const parts = id.split('__');
+    if (parts.length >= 2) {
+        const date = parts[0].replace(/_/g, '-');
+        const time = parts[1].replace(/_/g, ':');
+        return `${date} ${time}`;
+    }
+    return id;
+}
+
+// Render the main page
+async function renderMainPage() {
+    // Read conversation history
+    const conversationData = await readFileSafe(CONVERSATION);
+    const conversation = conversationData ? JSON.parse(conversationData) : [];
+    
+    // Filter out system messages
+    const messages = conversation.filter(msg => msg.type !== 'system');
+    
+    // Generate HTML
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -276,72 +315,70 @@ app.get('/', async (req, res) => {
     </script>
 </body>
 </html>`;
-        
-        res.send(html);
-    } catch (err) {
-        console.error('Error rendering page:', err);
-        res.status(500).send('Error loading chat');
-    }
-});
+}
 
-// AJAX endpoint to send prompt
-app.post('/send', async (req, res) => {
+// Create HTTP server
+const server = http.createServer(async (req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    const pathname = parsedUrl.pathname;
+    
     try {
-        const { prompt } = req.body;
-        
-        if (!prompt || !prompt.trim()) {
-            return res.status(400).json({ error: 'Prompt is required' });
+        // Route: GET /
+        if (req.method === 'GET' && pathname === '/') {
+            const html = await renderMainPage();
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(html);
         }
-        
-        // Check if inbox already exists (system busy)
-        try {
-            await fs.access(INBOX);
-            return res.status(409).json({ error: 'System is already processing a request' });
-        } catch {
-            // Good, inbox doesn't exist
+        // Route: POST /send
+        else if (req.method === 'POST' && pathname === '/send') {
+            const data = await parseJSON(req);
+            const { prompt } = data;
+            
+            if (!prompt || !prompt.trim()) {
+                sendJSON(res, 400, { error: 'Prompt is required' });
+                return;
+            }
+            
+            // Check if inbox already exists (system busy)
+            try {
+                await fs.access(INBOX);
+                sendJSON(res, 409, { error: 'System is already processing a request' });
+                return;
+            } catch {
+                // Good, inbox doesn't exist
+            }
+            
+            // Write prompt to inbox
+            await writeFileAtomic(INBOX, prompt.trim());
+            
+            sendJSON(res, 200, { success: true, message: 'Prompt sent successfully' });
         }
-        
-        // Write prompt to inbox
-        await writeFileAtomic(INBOX, prompt.trim());
-        
-        res.json({ success: true, message: 'Prompt sent successfully' });
+        // 404 for other routes
+        else {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not Found');
+        }
     } catch (err) {
-        console.error('Error sending prompt:', err);
-        res.status(500).json({ error: 'Failed to send prompt' });
+        console.error('Server error:', err);
+        if (res.headersSent) return;
+        
+        if (pathname === '/send') {
+            sendJSON(res, 500, { error: 'Internal server error' });
+        } else {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end('Internal Server Error');
+        }
     }
 });
 
-// Helper functions
-function escapeHtml(str) {
-    const div = { 
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    };
-    return str.replace(/[&<>"']/g, m => div[m]);
-}
-
-function formatTimestamp(id) {
-    // Extract timestamp from archive ID (e.g., "2024_03_15___14_30__summary")
-    const parts = id.split('__');
-    if (parts.length >= 2) {
-        const date = parts[0].replace(/_/g, '-');
-        const time = parts[1].replace(/_/g, ':');
-        return `${date} ${time}`;
-    }
-    return id;
-}
-
-// Initialize server
+// Initialize and start server
 async function initialize() {
     try {
         // Ensure workspace directory exists
         await fs.mkdir(WORKSPACE, { recursive: true });
         
         // Start server
-        app.listen(PORT, () => {
+        server.listen(PORT, () => {
             console.log(`Server running at http://localhost:${PORT}`);
             console.log(`Workspace: ${WORKSPACE}`);
         });
